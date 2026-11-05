@@ -1,10 +1,17 @@
 name: Release
 
-# On every push to main: build everything, and release an app whose version differs from its latest
-# tag. Each app has its own tags, cli-v1.2.3 and desktop-v1.2.3, so their versions can differ.
+# Releases an app whose version differs from its latest tag. Each app has its own tags, cli-v1.2.3 and
+# desktop-v1.2.3, so their versions can differ. Only pushes that touch a version file start this, and
+# nothing is built unless a release needs it. Run it by hand to retry a release that failed.
 on:
   push:
     branches: [main]
+    paths:
+      - steve-cli/pyproject.toml
+      - steve-desktop/package.json
+      - steve-desktop/src-tauri/Cargo.toml
+      - steve-desktop/src-tauri/tauri.conf.json
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,6 +22,7 @@ concurrency:
 
 jobs:
   versions:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
       cli_version: ${{ steps.check.outputs.cli_version }}
@@ -72,6 +80,8 @@ jobs:
             --notes "Install with \`uv tool install\` and this wheel's address, then run \`steve-agent web setup\` for the browser. Needs Python 3.13 or later."
 
   build:
+    needs: versions
+    if: needs.versions.outputs.desktop_release == 'true'
     uses: ./.github/workflows/build.yml
 
   release-desktop:

@@ -1,9 +1,8 @@
 name: Build
 
 # Windows and macOS can only be built and run on those systems, so this is what proves them.
-# release.yml calls this on every push to main, and publishes what it builds.
+# release.yml calls this for a new version of the app. Run it by hand to check a build without releasing.
 on:
-  pull_request:
   workflow_dispatch:
   workflow_call:
 
@@ -84,8 +83,10 @@ jobs:
           cat "$RUNNER_TEMP/serve.log"
           exit 1
 
-  # Not required to pass yet: the suite has only ever run on Linux, so this finds out what it assumes.
+  # Only when run by hand, not for a release. Not required to pass yet: this finds out what the suite
+  # assumes about Linux.
   cli-tests:
+    if: github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:

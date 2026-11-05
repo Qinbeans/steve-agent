@@ -22,7 +22,7 @@ pnpm tauri build
 
 This writes packages for the system it runs on to `src-tauri/target/release/bundle/`: an `.rpm` and a `.deb` on Linux, an installer on Windows, and an `.app` and a `.dmg` on macOS. There is deliberately no AppImage, which would ship its own copies of WebKitGTK and GTK. Each format uses the system's web view instead.
 
-`.github/workflows/build.yml` builds all three systems. On every push to main, `release.yml` runs it, and makes a release for an app whose version differs from its latest tag: `desktop-v1.2.3` with these packages, and `cli-v1.2.3` with the CLI's wheel. To release the app, change its version in `tauri.conf.json`, `package.json` and `Cargo.toml`, which have to agree. For the CLI, change it in `pyproject.toml`. Windows and macOS builds are not code signed, so those systems warn before opening them.
+`.github/workflows/build.yml` builds all three systems, and can be run by hand to check a build. `release.yml` runs when a push to main touches a version file, and only builds if there is something to release. It makes a release for an app whose version differs from its latest tag: `desktop-v1.2.3` with these packages, and `cli-v1.2.3` with the CLI's wheel. To release the app, change its version in `tauri.conf.json`, `package.json` and `Cargo.toml`, which have to agree. For the CLI, change it in `pyproject.toml`. Windows and macOS builds are not code signed, so those systems warn before opening them.
 
 The packages don't include the CLI, so whoever runs one also needs it, and the browser for the web tools:
 
