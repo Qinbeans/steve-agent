@@ -1,0 +1,43 @@
+[project]
+name = "steve-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Ryan Fong", email = "rfong7@csuchico.edu" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "deepagents>=0.7.32",
+    "fastapi>=0.162.0",
+    "httpx2>=2.16.0",
+    "langchain-mcp-adapters>=0.3.2",
+    "langchain-openai>=1.7.3",
+    "langsmith>=0.14.17",
+    "openai>=3.44.0",
+    "playwright>=1.64.1",
+    "pypdf>=6.21.4",
+    "pyyaml>=6.0.3",
+    "trafilatura>=2.3.1",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+steve-agent = "steve_agent:main"
+
+[build-system]
+requires = ["uv_build>=0.11.32,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "fastmcp>=3.4.11",
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1.post1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

@@ -1,0 +1,102 @@
+name: Release
+
+# On every push to main: build everything, and release an app whose version differs from its latest
+# tag. Each app has its own tags, cli-v1.2.3 and desktop-v1.2.3, so their versions can differ.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  versions:
+    runs-on: ubuntu-latest
+    outputs:
+      cli_version: ${{ steps.check.outputs.cli_version }}
+      cli_release: ${{ steps.check.outputs.cli_release }}
+      desktop_version: ${{ steps.check.outputs.desktop_version }}
+      desktop_release: ${{ steps.check.outputs.desktop_release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: check
+        name: Compare versions with the latest tags
+        run: |
+          cli=$(python3 -c 'import tomllib; print(tomllib.load(open("steve-cli/pyproject.toml", "rb"))["project"]["version"])')
+          desktop=$(jq -r .version steve-desktop/src-tauri/tauri.conf.json)
+          package=$(jq -r .version steve-desktop/package.json)
+          cargo=$(python3 -c 'import tomllib; print(tomllib.load(open("steve-desktop/src-tauri/Cargo.toml", "rb"))["package"]["version"])')
+          if [ "$desktop" != "$package" ] || [ "$desktop" != "$cargo" ]; then
+            echo "The app's versions differ: tauri.conf.json $desktop, package.json $package, Cargo.toml $cargo" >&2
+            exit 1
+          fi
+          {
+            echo "cli_version=$cli"
+            echo "cli_release=$(.github/scripts/needs-release.sh cli-v "$cli")"
+            echo "desktop_version=$desktop"
+            echo "desktop_release=$(.github/scripts/needs-release.sh desktop-v "$desktop")"
+          } >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+  release-cli:
+    needs: versions
+    if: needs.versions.outputs.cli_release == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.versions.outputs.cli_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      - name: Tests
+        working-directory: steve-cli
+        run: uv run --frozen pytest -q
+      - name: Build the wheel
+        working-directory: steve-cli
+        run: uv build --wheel --out-dir dist
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "cli-v$VERSION" steve-cli/dist/*.whl \
+            --target "$GITHUB_SHA" \
+            --title "Steve CLI $VERSION" \
+            --notes "Install with \`uv tool install\` and this wheel's address, then run \`steve-agent web setup\` for the browser. Needs Python 3.13 or later."
+
+  build:
+    uses: ./.github/workflows/build.yml
+
+  release-desktop:
+    # After every system has built, so that a release is never missing one.
+    needs: [versions, build]
+    if: needs.versions.outputs.desktop_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.versions.outputs.desktop_version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: steve-*
+          path: packages
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          find packages -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.exe' -o -name '*.dmg' \) -print0 > files
+          xargs -0 gh release create "desktop-v$VERSION" \
+            --repo "$REPO" \
+            --target "$GITHUB_SHA" \
+            --title "Steve $VERSION" \
+            --notes "The app needs the Steve CLI too: see the latest cli- release. The Windows and macOS builds are not code signed, so those systems warn before opening them." < files
